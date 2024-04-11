@@ -284,12 +284,13 @@ meta.data <- se_base@meta.data[match(my_vec,rownames(se_base@meta.data)),]
 se_base_reorder <- CreateSeuratObject(
   counts = as.data.frame(ct),
   assay = "scATAC",
-  meta.data = meta.data
-)
+  meta.data = meta.data)
 
 
-for (i in names(se_base@reductions)){
+for (i in sort(names(se_base@reductions))){
   embeddings <- Embeddings(se_base, reduction = i)
+  # all cells in reductions must be in the same order as the Seurat object
+  embeddings <- embeddings[match(colnames(se_base_reorder),rownames(embeddings)),]
 
   # this is for seurat < v5.0
   # se_base_reorder[[i]] <- CreateDimReducObject(embeddings = embeddings

@@ -59,11 +59,22 @@ def neighborhood_task(
     subprocess.run(['mkdir', f'{out_dir}'])
 
     project_dirs = glob.glob('neighborhood')
-
+#    www = glob.glob('www')
+#    seurat_objs = glob.glob('*.rds')
+#    gene_lists = glob.glob('*.csv')
+#    volcanos = glob.glob('*.txt')
+#    h5_files = glob.glob('*.h5')
+#    R_files = glob.glob('*.R')
 
     _mv_cmd = (
         ['mv'] +
         project_dirs +
+#        www +
+#        seurat_objs +
+#        gene_lists +
+#        volcanos +
+#        h5_files +
+#        R_files +
         [out_dir]
     )
 
