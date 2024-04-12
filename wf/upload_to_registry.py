@@ -26,7 +26,7 @@ class Run:
 @small_task(retries=0)
 def upload_to_registry(
     runs: List[Run],
-    archr_project: LatchDir,
+    project: LatchDir,
     run_table_id: str = "761",
     project_table_id: str = "917",
 ):
@@ -48,7 +48,7 @@ def upload_to_registry(
                     condition=run.condition,
                     spatial_directory=run.spatial_dir,
                     positions_file=run.positions_file,
-                    archrproject_outs=archr_project
+                    archrproject_outs=project
                 )
 
         for run in runs:  # loop through projects with linked uns
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 LatchFile('latch:///atx-illumina-1682977469.0200825/Images_spatial/D1294/spatial/tissue_positions_list.csv')
             )
         ],
-        archr_project=LatchDir("latch://13502.account/ArchRProjects/Babeyev"),
+        project=LatchDir("latch://13502.account/ArchRProjects/Babeyev"),
         run_table_id="761",
         project_table_id="917",
     )

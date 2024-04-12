@@ -19,10 +19,12 @@ RUN apt-get update -y && \
         libcurl4-openssl-dev \
         libfontconfig1-dev \
         libfreetype6-dev \
+        libgdal-dev \
         libgit2-dev \
         libgsl-dev \
         libicu-dev \
         liblzma-dev \
+        libmagick++-dev \
         libpango-1.0-0 \
         libpangocairo-1.0-0 \
         libpcre3-dev \
@@ -56,9 +58,7 @@ RUN apt-get install -y r-cran-devtools libcairo2-dev
 # Install packages
 RUN R -e "install.packages(c('Cairo', 'BiocManager', 'Matrix', 'Seurat','shiny', 'shinyhelper', 'data.table', 'Matrix', 'DT', 'magrittr','ggplot2','ggrepel','hdf5r','ggdendro','gridExtra', 'ggseqlogo', 'circlize','tidyverse','qdap'))"
 RUN R -e "devtools::install_github('immunogenomics/harmony')"
-RUN R -e "devtools::install_github('GreenleafLab/ArchR', ref='master', repos = BiocManager::repositories())"
 RUN R -e "devtools::install_github('GreenleafLab/chromVARmotifs')"
-RUN R -e "library('ArchR'); ArchR::installExtraPackages()"
 
 RUN R -e "BiocManager::install('BSgenome.Mmusculus.UCSC.mm10')"
 RUN R -e "BiocManager::install('BSgenome.Hsapiens.UCSC.hg38')"
@@ -78,31 +78,16 @@ RUN R CMD javareconf
 # Install more R packages
 RUN R -e "install.packages(c('pkgconfig', 'munsell', 'zip', 'zoo', 'xtable', 'listenv', 'lazyeval', 'bit64', 'rJava', 'labeling'), repos = 'http://cran.us.r-project.org')"
 
-RUN R -e "ArchR::installExtraPackages()"
-
 RUN R -e "BiocManager::install(version = '3.17',ask = FALSE)"
-RUN R -e "BiocManager::install('BSgenome.Hsapiens.UCSC.hg38', ask = FALSE)"
-RUN R -e "BiocManager::install('BSgenome.Mmusculus.UCSC.mm10', ask = FALSE)"
-
-# numpy needed to be install before macs2 v-2.2.6
-RUN python3 -m pip install numpy
-RUN python3 -m pip install macs2==2.2.6
-
-COPY scripts /root/scripts
-
 RUN R -e "BiocManager::install('org.Mm.eg.db', ask = FALSE)"
 RUN R -e "BiocManager::install('org.Hs.eg.db', ask = FALSE)"
 RUN R -e "install.packages(c('devtools','remotes','GGally','network','sna','ggraph','pheatmap','scico'), repos = 'http://cran.us.r-project.org')"
 RUN R -e "devtools::install_github('briatte/ggnet')"
-RUN apt-get update -y && \
-    apt-get install -y \
-        libmagick++-dev \
-        libgdal-dev
 
 RUN R -e "remotes::install_github('jbergenstrahle/STUtility')"
-
 RUN R -e "install.packages(c('dbscan'), repos = 'http://cran.us.r-project.org')"
 
+COPY scripts /root/scripts
 
 # STOP HERE:
 # The following lines are needed to ensure your build environement works

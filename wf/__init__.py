@@ -1,7 +1,3 @@
-''' Workflow for converting ATAC fragments (fragments.tss.gz) into ArchR
-objects for downstream analysis; additionally, generates UMAP and
-SpatialDimPlots for a list of lsi_varfeatures.
-'''
 import glob
 import subprocess
 
@@ -34,7 +30,7 @@ def neighborhood_task(
     genome: Genome
 ) -> LatchDir:
 
-    _archr_cmd = [
+    _r_cmd = [
         'Rscript',
         '/root/wf/neighborhood.R',
         project_name,
@@ -52,29 +48,17 @@ def neighborhood_task(
         for run in runs
     ]
 
-    _archr_cmd.extend(runs)
-    subprocess.run(_archr_cmd)
+    _r_cmd.extend(runs)
+    subprocess.run(_r_cmd)
 
     out_dir = project_name
     subprocess.run(['mkdir', f'{out_dir}'])
 
     project_dirs = glob.glob('neighborhood')
-#    www = glob.glob('www')
-#    seurat_objs = glob.glob('*.rds')
-#    gene_lists = glob.glob('*.csv')
-#    volcanos = glob.glob('*.txt')
-#    h5_files = glob.glob('*.h5')
-#    R_files = glob.glob('*.R')
 
     _mv_cmd = (
         ['mv'] +
         project_dirs +
-#        www +
-#        seurat_objs +
-#        gene_lists +
-#        volcanos +
-#        h5_files +
-#        R_files +
         [out_dir]
     )
 
@@ -109,7 +93,8 @@ metadata = LatchMetadata(
         ),
         'project_name': LatchParameter(
             display_name='project name',
-            description='Name of output directory in archr_outs/',
+            description='Name of output directory in \
+                        Neighborhood_Analysis_outputs',
             batch_table_column=True,
             rules=[
                 LatchRule(
@@ -127,12 +112,11 @@ metadata = LatchMetadata(
         'run_table_id': LatchParameter(
             display_name='Registry Table ID',
             description='The runs will be updated in Registry with its \
-                        corresponding condition, spatial directory, \
-                        condition, and location of the output archR project.'
+                        corresponding outs.'
         ),
         'project_table_id': LatchParameter(
             display_name='The ID of the SOWs Registry table',
-            description='The ArchR project will be inserted into the SOW \
+            description='The outs will be inserted into the SOW \
                         table for the corresponding runs.'
         )
     },
@@ -180,7 +164,7 @@ def neighborhoodanalysis_workflow(
     AtlasXomics [Discord](https://discord.com/channels/1004748539827597413/1005222888384770108).
 
     '''
-    archr_project = neighborhood_task(
+    project = neighborhood_task(
         runs=runs,
         project_name=project_name,
         genome=genome
@@ -188,12 +172,12 @@ def neighborhoodanalysis_workflow(
 
     upload_to_registry(
         runs=runs,
-        archr_project=archr_project,
+        project=project,
         run_table_id=run_table_id,
         project_table_id=project_table_id
     )
 
-    return archr_project
+    return project
 
 
 LaunchPlan(
