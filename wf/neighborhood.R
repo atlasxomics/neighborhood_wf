@@ -163,7 +163,7 @@ main_func <- function(seurat_lst) {
   # removd extra cells
   extra_cells <- setdiff(colnames(combined_mat), rownames(Spatial_D00_all[[1]]))
   combined_mat <- combined_mat[, which(
-    !colnames(combined_mat) % in % extra_cells
+    !colnames(combined_mat) %in% extra_cells
   )
   ]
   combined_mat <- as.matrix(combined_mat)
