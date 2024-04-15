@@ -55,15 +55,9 @@ RUN echo "TZ=$( cat /etc/timezone )" >> /etc/R/Renviron.site
 # Have to install devtools, cairo like this; see https://stackoverflow.com/questions/20923209
 RUN apt-get install -y r-cran-devtools libcairo2-dev
 
-# Install packages
-RUN R -e "install.packages(c('Cairo', 'BiocManager', 'Matrix', 'Seurat','shiny', 'shinyhelper', 'data.table', 'Matrix', 'DT', 'magrittr','ggplot2','ggrepel','hdf5r','ggdendro','gridExtra', 'ggseqlogo', 'circlize','tidyverse','qdap'))"
-RUN R -e "devtools::install_github('immunogenomics/harmony')"
-RUN R -e "devtools::install_github('GreenleafLab/chromVARmotifs')"
-
-RUN R -e "BiocManager::install('BSgenome.Mmusculus.UCSC.mm10')"
-RUN R -e "BiocManager::install('BSgenome.Hsapiens.UCSC.hg38')"
-RUN R -e "devtools::install_github('SGDDNB/ShinyCell')"
-RUN R -e "BiocManager::install('ComplexHeatmap')"
+# Install java
+RUN apt install -y default-jdk
+RUN R CMD javareconf
 
 # Upgrade R to version 4.3.0
 RUN wget https://cran.r-project.org/src/base/R-4/R-4.3.0.tar.gz
@@ -71,22 +65,16 @@ RUN tar zxvf R-4.3.0.tar.gz
 RUN cd R-4.3.0 && ./configure --enable-R-shlib
 RUN cd R-4.3.0 && make && make install
 
-# Install java
-RUN apt install -y default-jdk
-RUN R CMD javareconf
+# Installation of R packages with renv
+RUN R -e "install.packages('https://cran.r-project.org/src/contrib/renv_1.0.5.tar.gz', repos = NULL, type = 'source')"
+COPY renv.lock /root/renv.lock
+COPY .Rprofile /root/.Rprofile
+RUN mkdir /root/renv
+COPY renv/activate.R /root/renv/activate.R
+COPY renv/settings.json /root/renv/settings.json
+RUN R -e "renv::restore()"
 
-# Install more R packages
-RUN R -e "install.packages(c('pkgconfig', 'munsell', 'zip', 'zoo', 'xtable', 'listenv', 'lazyeval', 'bit64', 'rJava', 'labeling'), repos = 'http://cran.us.r-project.org')"
-
-RUN R -e "BiocManager::install(version = '3.17',ask = FALSE)"
-RUN R -e "BiocManager::install('org.Mm.eg.db', ask = FALSE)"
-RUN R -e "BiocManager::install('org.Hs.eg.db', ask = FALSE)"
-RUN R -e "install.packages(c('devtools','remotes','GGally','network','sna','ggraph','pheatmap','scico'), repos = 'http://cran.us.r-project.org')"
-RUN R -e "devtools::install_github('briatte/ggnet')"
-
-RUN R -e "remotes::install_github('jbergenstrahle/STUtility')"
-RUN R -e "install.packages(c('dbscan'), repos = 'http://cran.us.r-project.org')"
-
+# Copy scripts
 COPY scripts /root/scripts
 
 # STOP HERE:
