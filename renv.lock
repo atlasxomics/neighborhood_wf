@@ -2007,6 +2007,16 @@
         "methods"
       ],
       "Hash": "a78df53519d3e976b4269414bddc2513"
+    }, 
+    "org.Rn.eg.db": {
+      "Package": "org.Rn.eg.db",
+      "Version": "3.17.0",
+      "Source": "Bioconductor",
+      "Requirements": [
+        "AnnotationDbi",
+        "R",
+        "methods"
+      ]
     },
     "parallelly": {
       "Package": "parallelly",

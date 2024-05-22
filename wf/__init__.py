@@ -5,11 +5,9 @@ from enum import Enum
 from typing import List
 
 from latch import custom_task, workflow
-from latch.resources.launch_plan import LaunchPlan
 from latch.types import (
     LatchAuthor,
     LatchDir,
-    LatchFile,
     LatchMetadata,
     LatchParameter,
     LatchRule
@@ -21,6 +19,7 @@ from wf.upload_to_registry import upload_to_registry, Run
 class Genome(Enum):
     mm10 = 'mm10'
     hg38 = 'hg38'
+    rnor6 = 'rnor6'
 
 
 @custom_task(cpu=62, memory=384, storage_gib=500)
