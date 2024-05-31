@@ -74,6 +74,10 @@ COPY renv/activate.R /root/renv/activate.R
 COPY renv/settings.json /root/renv/settings.json
 RUN R -e "renv::restore()"
 
+# Copy files for .renvignore to work
+COPY neighborhood_wf.Rproj /root/neighborhood_wf.Rproj
+COPY .renvignore /root/.renvignore
+
 # STOP HERE:
 # The following lines are needed to ensure your build environement works
 # correctly with latch.
