@@ -1,25 +1,25 @@
-#' Color palette to be used in the analyses
-
 library(RColorBrewer)
+
 colors_main <- c("#A5D7E5", "#FEC567")
-colors_multi <- c("#a5d7e5",
-                  "#fec567",
-                  "#db7f9b",
-                  "#b1babe",
-                  "#afdd91",
-                  "#c48ec0",
-                  "#be8f87",
-                  "#b2ecd4",
-                  "#ffefba",
-                  "#e3c6ea",
-                  "#acb791",
-                  "#f4b9c1",
-                  "#a9c7cd",
-                  "#77a1bf",
-                  "#e0c79b",
-                  "#fb7272",
-                  "grey50")
-colors_insulin <- c("#badce6", "#54a2b8")
+colors_multi <- c(
+    "#a5d7e5",
+    "#fec567",
+    "#db7f9b",
+    "#b1babe",
+    "#afdd91",
+    "#c48ec0",
+    "#be8f87",
+    "#b2ecd4",
+    "#ffefba",
+    "#e3c6ea",
+    "#acb791",
+    "#f4b9c1",
+    "#a9c7cd",
+    "#77a1bf",
+    "#e0c79b",
+    "#fb7272",
+    "grey50"
+)
 colors_mval <- c("5.71" = "#a6dbbb",
                  "7" = "#3cb67b",
                  "9.29" = "#359566",

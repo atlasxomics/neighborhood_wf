@@ -74,9 +74,6 @@ COPY renv/activate.R /root/renv/activate.R
 COPY renv/settings.json /root/renv/settings.json
 RUN R -e "renv::restore()"
 
-# Copy scripts
-COPY scripts /root/scripts
-
 # STOP HERE:
 # The following lines are needed to ensure your build environement works
 # correctly with latch.
