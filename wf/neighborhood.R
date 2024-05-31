@@ -17,6 +17,8 @@ library("Seurat")
 library("sna")
 library("STutility")
 
+source("wf/colors.R")
+
 dir.create("/root/neighborhood", showWarnings = FALSE)
 setwd("/root/neighborhood")
 
@@ -255,7 +257,7 @@ for (run in runs) {
   dir.create(file.path(cidr, ctmat), recursive = TRUE)
 }
 
-figs_dir <- paste0("/neighborhood/results/figures")
+figs_dir <- "/neighborhood/figures"
 dir.create(file.path(cidr, figs_dir), recursive = TRUE)
 
 if (genome == "hg38") {
@@ -266,15 +268,6 @@ if (genome == "hg38") {
   species <- org.Rn.eg.db 
 }
 species
-
-ANALYSIS <- args[1]
-DIR_ROOT <- "/root/neighborhood/"
-DIR_WD <- file.path("/root/scripts")
-DIR_DATA <- file.path(DIR_ROOT, "data")
-DIR_RES <- file.path(DIR_ROOT, "results")
-DIR_FIG <- file.path(DIR_RES, "figures")
-
-source(file.path(DIR_WD, "colors.R"))
 
 se_base <- combined
 strsplits <- strsplit(rownames(se_base@meta.data), "\\s|#")
@@ -473,7 +466,7 @@ infoTable = data.frame(
       pattern = "tissue_hires_image.png", recursive = TRUE, include.dirs = TRUE
     )
   ),
-  "json"=paste0(
+  "json" = paste0(
     getwd(),
     "/",
     list.files(
@@ -962,9 +955,9 @@ g2 <- graph_from_data_frame(d = links, vertices = df, directed = FALSE)
 g2 <- set_edge_attr(g2, "weight", value = minmax_norm(abs(E(g)$weight)))
 E(g2)$width <- (E(g2)$weight + 0.1) * 14
 
-fname <- paste0("nbs_analysis.permscore.", ANALYSIS)
+fname <- paste0("nbs_analysis.permscore.", project_name)
 pdf(
-  file = file.path(DIR_FIG, paste0(fname, ".pdf")),
+  file = file.path(figs_dir, paste0(fname, ".pdf")),
   width = 5.5,
   height = 5.5,
   useDingbats = FALSE
@@ -1028,10 +1021,10 @@ p1 <- pheatmap(
   na_col = "white"
 )
 
-fname <- paste0("nbs_analysis.permscore_hm.", ANALYSIS)
+fname <- paste0("nbs_analysis.permscore_hm.", project_name)
 
 pdf(
-  file = file.path(DIR_FIG, paste0(fname, ".pdf")),
+  file = file.path(figs_dir, paste0(fname, ".pdf")),
   width = 5,
   height = 4.8,
   useDingbats = FALSE

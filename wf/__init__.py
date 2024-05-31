@@ -50,22 +50,19 @@ def neighborhood_task(
     _r_cmd.extend(runs)
     subprocess.run(_r_cmd)
 
-    out_dir = project_name
-    subprocess.run(['mkdir', f'{out_dir}'])
-
     project_dirs = glob.glob('neighborhood')
 
     _mv_cmd = (
         ['mv'] +
         project_dirs +
-        [out_dir]
+        [project_name]
     )
 
     subprocess.run(_mv_cmd)
 
     return LatchDir(
-        f'/root/{out_dir}',
-        f'latch:///Neighborhood_Analysis_outputs/{out_dir}'
+        f'/root/{project_name}',
+        f'latch:///Neighborhood_Analysis_outputs/{project_name}'
     )
 
 
