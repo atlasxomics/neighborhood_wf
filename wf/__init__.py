@@ -1,4 +1,3 @@
-import glob
 import subprocess
 
 from enum import Enum
@@ -22,19 +21,14 @@ class Genome(Enum):
     rnor6 = 'rnor6'
 
 
-@custom_task(cpu=62, memory=384, storage_gib=500)
+@custom_task(cpu=8, memory=384, storage_gib=500)
 def neighborhood_task(
     runs: List[Run],
     project_name: str,
     genome: Genome
 ) -> LatchDir:
 
-    _r_cmd = [
-        'Rscript',
-        '/root/wf/neighborhood.R',
-        project_name,
-        genome.value
-    ]
+    _r_cmd = ['Rscript', '/root/wf/neighborhood.R', project_name, genome.value]
 
     runs = [
         (
@@ -50,13 +44,7 @@ def neighborhood_task(
     _r_cmd.extend(runs)
     subprocess.run(_r_cmd)
 
-    project_dirs = glob.glob('neighborhood')
-
-    _mv_cmd = (
-        ['mv'] +
-        project_dirs +
-        [project_name]
-    )
+    _mv_cmd = ['mv', '/root/neighborhood/figures', f'/root/{project_name}']
 
     subprocess.run(_mv_cmd)
 
@@ -125,8 +113,8 @@ def neighborhoodanalysis_workflow(
     runs: List[Run],
     genome: Genome,
     project_name: str,
-    run_table_id: str = "761",
-    project_table_id: str = "779"
+    run_table_id: str = '761',
+    project_table_id: str = '779'
 ) -> LatchDir:
     '''Workflow for neighborhood analysis.
 
