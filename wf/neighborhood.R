@@ -238,26 +238,31 @@ for (run in runs) {
 
   run_id <- run[1]
   spatial_path <- run[5]
-  cidr <- "/root"
   print(run_id)
 
-  req_dirs <- paste0("/neighborhood/data/", run_id)
-  dir.create(file.path(cidr, req_dirs), recursive = TRUE)
+  cidr <- "/root"
 
-  newDir <- paste0("/root/neighborhood/data/", run_id)
-  file.copy(spatial_path, newDir, recursive = TRUE)
+  # Make dir /root/neighborhood/data/[run_id] for each run.
+  run_dir <- paste0(cidr, "/neighborhood/data/", run_id)
+  dir.create(run_dir, recursive = TRUE)
 
-  spatial_dir <- list.files(paste0("/root/neighborhood/data/", run_id))
+  # Copy spatial dir to run dir.
+  file.copy(spatial_path, run_dir, recursive = TRUE)
+
+  # Rename spatial dir from flyte id to 'spatial/'.
+  spatial_dir <- list.files(run_dir)
   file.rename(
-    paste0("/root/neighborhood/data/", run_id, "/", spatial_dir),
-    paste0("/root/neighborhood/data/", run_id, "/spatial")
+    paste0(run_dir, "/", spatial_dir),
+    paste0(run_dir, "/spatial")
   )
 
-  ctmat <- paste0("/neighborhood/data/", run_id, "/ctmat")
-  dir.create(file.path(cidr, ctmat), recursive = TRUE)
+  # Make dir /root/neighborhood/data/[run_id]/ctmat
+  ctmat <- paste0(run_dir, "/ctmat")
+  dir.create(ctmat, recursive = TRUE)
 }
 
-figs_dir <- "/neighborhood/figures"
+# make dir /root/neighborhood/figures
+figs_dir <- "neighborhood/figures"
 dir.create(file.path(cidr, figs_dir), recursive = TRUE)
 
 if (genome == "hg38") {
@@ -889,7 +894,9 @@ for (subject_id in names(nbs_adjmat_list_subject)) {
   )
   
   #' Set row/column names
-  rownames(nbs_adjmat_permscore_subject[[subject_id]]) <- colnames(nbs_adjmat_permscore_subject[[subject_id]]) <- paste0("C", c_include)
+  names_vector <- paste0("C", c_include)
+  colnames(nbs_adjmat_permscore_subject[[subject_id]]) <- names_vector
+  rownames(nbs_adjmat_permscore_subject[[subject_id]]) <- names_vector
 }
 # ===================================
 #' PLOTS
@@ -955,9 +962,9 @@ g2 <- graph_from_data_frame(d = links, vertices = df, directed = FALSE)
 g2 <- set_edge_attr(g2, "weight", value = minmax_norm(abs(E(g)$weight)))
 E(g2)$width <- (E(g2)$weight + 0.1) * 14
 
-fname <- paste0("nbs_analysis.permscore.", project_name)
+fname <- paste0("nbs_analysis.permscore.", project_name, ".pdf")
 pdf(
-  file = file.path(figs_dir, paste0(fname, ".pdf")),
+  file = file.path("/root", figs_dir, fname),
   width = 5.5,
   height = 5.5,
   useDingbats = FALSE
@@ -1021,10 +1028,9 @@ p1 <- pheatmap(
   na_col = "white"
 )
 
-fname <- paste0("nbs_analysis.permscore_hm.", project_name)
-
+fname <- paste0("nbs_analysis.permscore_hm.", project_name, ".pdf")
 pdf(
-  file = file.path(figs_dir, paste0(fname, ".pdf")),
+  file = file.path("/root", figs_dir, fname),
   width = 5,
   height = 4.8,
   useDingbats = FALSE
