@@ -14,6 +14,9 @@ RUN Rscript /root/download_git.R
 COPY renv.lock /root/renv.lock
 RUN R -e "renv::restore(prompt = FALSE)"
 
+# Copy .Rprofile to set CRAN mirror
+COPY .Rprofile /root/.Rprofile
+
 # STOP HERE:
 # The following lines are needed to ensure your build environement works
 # correctly with latch.
