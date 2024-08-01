@@ -44,7 +44,6 @@ species <- annotations[[genome]]
 seuratobj_paths <- sapply(runs, `[`, 2)
 seurat_list <-  lapply(seuratobj_paths, readRDS)
 all <- rename_cells(seurat_list) # from utils.R
-saveRDS(all, "/root/neighborhood/all.rds")
 
 # Combine SeuratObject for each run into 'combined' SeuratObject --------------
 samples <- find_sample_names(all) # from utils.R
@@ -59,7 +58,6 @@ spatial <- lapply(all, function(x) {
 
 print("Creating combined SeuratObject...")
 combined <- combine_objs(all, samples, spatial, project_name)  # from utils.R
-saveRDS(combined, "/root/neighborhood/combined.rds")
 
 # Main script -----------------------------------------------------------------
 
@@ -134,8 +132,6 @@ for (sample in samples) {
   my_vec <- c(my_vec, new_value) # Appending new value to vector
 }
 
-saveRDS(se_base, "/root/neighborhood/se_base.rds")
-
 ct <- as.matrix(se_base@assays$scATAC@layers$counts)
 colnames(ct) <- colnames(se_base)
 rownames(ct) <- rownames(se_base)
@@ -175,8 +171,6 @@ se_base_reorder <- FindVariableFeatures(
   nfeatures = nrow(se_base_reorder)
 )
 se_base_reorder@meta.data$barcodes1 <- rownames(se_base_reorder@meta.data)
-
-saveRDS(se_base_reorder, "/root/neighborhood/se_base_reorder.rds")
 
 for (sample in samples) {
 
@@ -294,7 +288,6 @@ se <- InputFromTable(
   transpose = FALSE,
   platform =  "Visium"
 )
-saveRDS(se, "/root/neighborhood/se.rds")
 
 new.names <- colnames(se)
 renamed.assay <- RenameCells(se_base_reorder, new.names = new.names)
@@ -336,8 +329,6 @@ for (i in seq_along(samples)) {
     se_base_reorder@meta.data$sample_id
   )
 }
-
-saveRDS(se_base_reorder, "se_base_reorder2.rds")
 
 n_clusters <- length(unique(se_base_reorder$Clusters))
 cols <- colorRampPalette(
