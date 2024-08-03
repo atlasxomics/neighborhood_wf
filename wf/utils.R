@@ -121,6 +121,8 @@ combine_objs <- function(seurat_lst, samples, spatial, project_name) {
       assay = "scATAC",
       meta.data = meta.data
     )
+
+    combined <- SeuratObject::JoinLayers(combined)
   }
 
   # Normalize and calculate variable features
