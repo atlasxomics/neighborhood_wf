@@ -2,31 +2,35 @@ library(RColorBrewer)
 
 colors_main <- c("#A5D7E5", "#FEC567")
 colors_multi <- c(
-    "#a5d7e5",
-    "#fec567",
-    "#db7f9b",
-    "#b1babe",
-    "#afdd91",
-    "#c48ec0",
-    "#be8f87",
-    "#b2ecd4",
-    "#ffefba",
-    "#e3c6ea",
-    "#acb791",
-    "#f4b9c1",
-    "#a9c7cd",
-    "#77a1bf",
-    "#e0c79b",
-    "#fb7272",
-    "grey50"
+  "#a5d7e5",
+  "#fec567",
+  "#db7f9b",
+  "#b1babe",
+  "#afdd91",
+  "#c48ec0",
+  "#be8f87",
+  "#b2ecd4",
+  "#ffefba",
+  "#e3c6ea",
+  "#acb791",
+  "#f4b9c1",
+  "#a9c7cd",
+  "#77a1bf",
+  "#e0c79b",
+  "#fb7272",
+  "grey50"
 )
-colors_mval <- c("5.71" = "#a6dbbb",
-                 "7" = "#3cb67b",
-                 "9.29" = "#359566",
-                 "12.4" = "#2e7651")
-colors_adi <- c("Adipocyte 1" = "#BFABC3",
-                "Adipocyte 2" = "#907198",
-                "Adipocyte 3" = "#62376E")
+colors_mval <- c(
+  "5.71" = "#a6dbbb",
+  "7" = "#3cb67b",
+  "9.29" = "#359566",
+  "12.4" = "#2e7651"
+)
+colors_adi <- c(
+  "Adipocyte 1" = "#BFABC3",
+  "Adipocyte 2" = "#907198",
+  "Adipocyte 3" = "#62376E"
+)
 
 color_low <- "#441153"
 color_low2 <- "#62376e"

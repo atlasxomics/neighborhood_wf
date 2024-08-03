@@ -1,3 +1,4 @@
+library("BPCells")
 library("dplyr")
 library("GGally")
 library("ggnet")
@@ -18,221 +19,47 @@ library("sna")
 library("STutility")
 
 source("wf/colors.R")
+source("wf/scwat_funcs.R")
+source("wf/utils.R")
 
+
+# Set globals -----------------------------------------------------------------
 dir.create("/root/neighborhood", showWarnings = FALSE)
 setwd("/root/neighborhood")
-
-find_func <- function(tempdir, pattern) {
-
-  list.files(
-    path = tempdir, # replace with the directory you want
-    pattern = pattern, # has "test", ".csv", and then nothing else ($)
-    full.names = TRUE, # include the directory in the result
-    recursive = TRUE
-  )
-}
 
 args <- commandArgs(trailingOnly = TRUE)
 
 project_name <- args[1]
 genome <- args[2]
 
-runs <- strsplit(args[3:length(args)], ",")
+runs <- strsplit(args[3: length(args)], ",")
 runs
 
-# @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+annotations <- list(
+  "mm10" = org.Mm.eg.db, "hg38" = org.Hs.eg.db, "rnor6" = org.Rn.eg.db
+)
+species <- annotations[[genome]]
 
-all <-  list()
-for (i in seq_along(runs)) {
-  all[[i]] <- readRDS(runs[[i]][2])
-  all[[i]] <- RenameCells(
-    all[[i]],
-    new.names = paste0(
-      unique(all[[i]]@meta.data$Sample),
-      "#",
-      colnames(all[[i]]), "-1"
-    )
-  )
-}
-all
+# Create list of SeuratObjs, rename cells with run_id to be unique -----
+seuratobj_paths <- sapply(runs, `[`, 2)
+seurat_list <-  lapply(seuratobj_paths, readRDS)
+all <- rename_cells(seurat_list) # from utils.R
 
-saveRDS(all, "/root/neighborhood/all.rds")
+# Combine SeuratObject for each run into 'combined' SeuratObject --------------
+samples <- find_sample_names(all) # from utils.R
 
-#===========================#===========================
+# Extract image coordinates as -(imagecols) | imagerow -----
+spatial <- lapply(all, function(x) {
+  df <- as.data.frame(x@images[[1]]@coordinates[, c(5, 4)])
+  colnames(df) <- paste0("Spatial_", 1:2)
+  df$Spatial_2 <- -df$Spatial_2
+  df
+})
 
-main_func <- function(seurat_lst) {
-  find_samples_name <- function(seurat_lst) {
-    sapply(
-      seq_along(seurat_lst),
-      function(i) unique(seurat_lst[[i]]@meta.data$Sample))
-  }
+print("Creating combined SeuratObject...")
+combined <- combine_objs(all, samples, spatial, project_name)  # from utils.R
 
-  samples <- find_samples_name(seurat_lst)
-
-  D00_fun <- function(seurat_lst) {
-    toRemove <- lapply(
-      seurat_lst,
-      function(x) {
-        names(which(colSums(is.na(x@assays[[1]]@counts)) > 0))
-      }
-    )
-    mapply(function(x, y) x[, !colnames(x) %in% y], seurat_lst, toRemove)
-  }
-
-  D00 <- D00_fun(seurat_lst)
-  Spatial_D00_fun <- function(D00) {
-
-    Spatial_D00 <- lapply(
-      D00,
-      function(x) as.data.frame(x@images[[1]]@coordinates[, c(5, 4)])
-    )
-    Spatial_D00 <- lapply(
-      Spatial_D00,
-      function(x) {
-        colnames(x) <- paste0("Spatial_", 1:2)
-        x
-      }
-    )
-    lapply(
-      Spatial_D00,
-      function(x) {
-        x$Spatial_2 <- -(x$Spatial_2)
-        x
-      }
-    )
-  }
-  Spatial_D00 <- Spatial_D00_fun(D00)
-
-  Spatial_D00_all_fun <- function(Spatial_D00) {
-
-    tmp <- lapply(
-      seq_along(Spatial_D00),
-      function(i) {
-        bind_rows(Spatial_D00[-i])
-      }
-    )
-
-    tmp <- lapply(
-      tmp,
-      function(x) {
-        x$Spatial_1 <- 0
-        x
-      }
-    )
-    tmp <- lapply(
-      tmp,
-      function(x) {
-        x$Spatial_2 <- 0
-        x
-      }
-    )
-    tmp <- lapply(
-      seq_along(Spatial_D00),
-      function(i) {
-        as.matrix(rbind(Spatial_D00[[i]], tmp[[i]]))
-      }
-    )
-  }
-
-  Spatial_D00_all <- Spatial_D00_all_fun(Spatial_D00)
-
-  temp_fun <- function(D00) {
-    temp <- lapply(D00, function(x) as.data.frame(x@assays[[1]]@counts))
-    temp <- lapply(
-      temp,
-      function(x) {
-        x$region <- rownames(x)
-        x
-      }
-    )
-    lapply(
-      temp,
-      function(x) {
-        rownames(x) <- NULL
-        x
-      }
-    )
-  }
-
-  temp <- temp_fun(D00)
-
-  # merge seurat objects
-  combined_mat <- reduce(temp, full_join, by = "region")
-
-  rownames(combined_mat) <- combined_mat$region
-  combined_mat$region <- NULL
-
-  # removd extra cells
-  extra_cells <- setdiff(colnames(combined_mat), rownames(Spatial_D00_all[[1]]))
-  combined_mat <- combined_mat[, which(
-    !colnames(combined_mat) %in% extra_cells
-  )
-  ]
-  combined_mat <- as.matrix(combined_mat)
-
-  # clean columns of metadata per sample attached sample's name before rbind
-  l <- D00
-  l <- lapply(
-    l,
-    function(x) {
-      colnames(x@meta.data) <- gsub(
-        paste0("_", Assays(x)), "", colnames(x@meta.data)
-      )
-      x
-    }
-  )
-  D00 <- l
-
-  # first get the list of meta data
-  list_of_metadata <- lapply(D00, function(x) x@meta.data)
-  # rbind meta data per samples
-  meta.data <- do.call("rbind", list_of_metadata)
-  write.csv(meta.data, "req_meta_data.csv", row.names = TRUE)
-
-  combined <- CreateSeuratObject(
-    counts = combined_mat,
-    assay = "scATAC",
-    meta.data = meta.data
-  )
-
-  combined@meta.data$Clusters <- factor(
-    combined@meta.data$Clusters,
-    levels = c(
-      paste0("C", seq_along(unique(combined@meta.data$Clusters)))
-    )
-  )
-
-  Spatial_D00 <- list()
-  for (i in seq_along(samples)) {
-    Spatial_D00[[i]] <- Spatial_D00_all[[i]][colnames(combined), ]
-    combined[[paste0(samples[i], "Spatial")]] <- CreateDimReducObject(
-      embeddings = Spatial_D00[[i]],
-      key = paste0(samples[i], "Spatial_"),
-      assay = DefaultAssay(combined)
-    )
-  }
-
-  # we need to run Variable Features
-  combined <- NormalizeData(
-    combined,
-    normalization.method = "LogNormalize",
-    scale.factor = 10000
-  )
-  combined <- FindVariableFeatures(
-    combined,
-    selection.method = "vst",
-    nfeatures = 2000
-  )
-  return(combined)
-}
-
-#===========================================
-
-combined <- main_func(all)
-combined
-saveRDS(combined, "/root/neighborhood/combined.rds")
-
-#================================
+# Main script -----------------------------------------------------------------
 
 for (run in runs) {
 
@@ -265,48 +92,32 @@ for (run in runs) {
 figs_dir <- "neighborhood/figures"
 dir.create(file.path(cidr, figs_dir), recursive = TRUE)
 
-if (genome == "hg38") {
-  species <- org.Hs.eg.db
-} else if (genome == "mm10") {
-  species <- org.Mm.eg.db
-} else if (genome == "rnor6") {
-  species <- org.Rn.eg.db 
-}
-species
-
 se_base <- combined
 strsplits <- strsplit(rownames(se_base@meta.data), "\\s|#")
 
-fun1 <- function(lst, nthelement) {
-  sapply(lst, `[`, 1)
-}
-
-fun2 <- function(lst,nthelement) {
-  sapply(lst, `[`, 2)
-}
-
-se_base@meta.data$sample <- fun1(strsplits)
-se_base@meta.data$barcode <- fun2(strsplits)
+se_base@meta.data$sample <- extract_nth_ele(strsplits, 1) # from utils.R
+se_base@meta.data$barcode <- extract_nth_ele(strsplits, 2) # from utils.R
 
 samples <- sort(unique(se_base@meta.data$sample))
 
 my_vec <- c()
 
-for (sple in sort(samples)) {
-  # Head of for-loop
+for (sample in samples) {
+
   se_base_D_ordered <- se_base[, which(
-    se_base@meta.data$Sample == sple
+    se_base@meta.data$Sample == sample
   )]@meta.data
 
+  # Get intersect of barcodes bt obj metadata and tissue_positions
   req_order <- intersect(
     read.csv(
       paste0(
-        "/root/neighborhood/data/",
-        sple,
-        "/spatial/tissue_positions_list.csv"
+        "/root/neighborhood/data/", sample, "/spatial/tissue_positions_list.csv"
       ),
-      header = FALSE)$V1,
-      se_base_D_ordered$barcode) # Creating new value
+      header = FALSE
+    )$V1,
+    se_base_D_ordered$barcode
+  )
 
   se_base_D_ordered$barcode <- factor(
     se_base_D_ordered$barcode,
@@ -317,17 +128,15 @@ for (sple in sort(samples)) {
 
   new_value <- rownames(se_base_D_ordered)
 
-  print(sple)
-  my_vec <- c(my_vec, new_value)    # Appending new value to vector
+  print(sample)
+  my_vec <- c(my_vec, new_value) # Appending new value to vector
 }
 
-saveRDS(se_base, "/root/neighborhood/se_base.rds")
-
 ct <- as.matrix(se_base@assays$scATAC@layers$counts)
-colnames(ct)<- colnames(se_base)
-rownames(ct)<- rownames(se_base)
-ct <- ct[,match(my_vec,colnames(ct))]
-meta.data <- se_base@meta.data[match(my_vec,rownames(se_base@meta.data)), ]
+colnames(ct) <- colnames(se_base)
+rownames(ct) <- rownames(se_base)
+ct <- ct[, match(my_vec, colnames(ct))]
+meta_data <- se_base@meta.data[match(my_vec, rownames(se_base@meta.data)), ]
 
 se_base_reorder <- CreateSeuratObject(
   counts = as.data.frame(ct),
@@ -363,11 +172,9 @@ se_base_reorder <- FindVariableFeatures(
 )
 se_base_reorder@meta.data$barcodes1 <- rownames(se_base_reorder@meta.data)
 
-saveRDS(se_base_reorder, "/root/neighborhood/se_base_reorder.rds")
+for (sample in samples) {
 
-for (sple in samples) {
-
-  D_ <- se_base[, which(se_base@meta.data$sample == sple)]
+  D_ <- se_base[, which(se_base@meta.data$sample == sample)]
 
   write.table(
     data.frame(
@@ -375,8 +182,8 @@ for (sple in samples) {
         mapIds(
           species,
           rownames(D_),
-          keytype="SYMBOL",
-          column="ENSEMBL",
+          keytype = "SYMBOL",
+          column = "ENSEMBL",
           multiVals = "first"
         )
       ),
@@ -388,13 +195,13 @@ for (sple in samples) {
     ),
     gzfile(
       paste0(
-        "/root/neighborhood/data/", "/", sple, "/ctmat/features.tsv.gz"
+        "/root/neighborhood/data/", sample, "/ctmat/features.tsv.gz"
       )
     ),
     sep = "\t",
     col.names = FALSE,
     row.names = FALSE,
-    quote= FALSE
+    quote = FALSE
   )
 
   # We compress it deleting the .csv
@@ -402,7 +209,7 @@ for (sple in samples) {
     D_@meta.data$barcode,
     gzfile(
       paste0(
-        "/root/neighborhood/data/", "/", sple, "/ctmat/barcodes.tsv.gz"
+        "/root/neighborhood/data/", sample, "/ctmat/barcodes.tsv.gz"
       )
     ),
     sep = "\t",
@@ -413,21 +220,18 @@ for (sple in samples) {
 
   writeMM(
     obj = D_@assays$scATAC@layers$counts,
-    file=(
-      paste0("/root/neighborhood/data/", "/", sple, "/ctmat/matrix.mtx.gz")
+    file = (
+      paste0("/root/neighborhood/data/", sample, "/ctmat/matrix.mtx.gz")
     )
   )
 }
 
 # also add -1 at the name of barcodes in tissue_position_list.csv file
-for (sple in samples) {
+for (sample in samples) {
 
   tiss_pos <- read.csv(
     paste0(
-      "/root/neighborhood/data/",
-      "/",
-      sple,
-      "/spatial/tissue_positions_list.csv"
+      "/root/neighborhood/data/", sample, "/spatial/tissue_positions_list.csv"
     ),
     header = FALSE
   )
@@ -440,8 +244,7 @@ for (sple in samples) {
     tiss_pos,
     paste0(
       "/root/neighborhood/data/",
-      "/",
-      sple,
+      sample,
       "/spatial/tissue_positions_list.csv"
     ),
     row.names = FALSE,
@@ -449,11 +252,11 @@ for (sple in samples) {
   )
 }
 
-infoTable = data.frame(
+infoTable <- data.frame(
   "samples" = paste0(
     getwd(),
     "/",
-    list.files(pattern = "ctmat", recursive = TRUE, include.dirs =TRUE)
+    list.files(pattern = "ctmat", recursive = TRUE, include.dirs = TRUE)
   ),
   "spotfiles" = paste0(
     getwd(),
@@ -485,7 +288,6 @@ se <- InputFromTable(
   transpose = FALSE,
   platform =  "Visium"
 )
-saveRDS(se, "/root/neighborhood/se.rds")
 
 new.names <- colnames(se)
 renamed.assay <- RenameCells(se_base_reorder, new.names = new.names)
@@ -494,7 +296,7 @@ se_base_reorder <- renamed.assay
 
 head(se@tools$Staffli@imgs)
 
-# Add Staffli 
+# Add Staffli
 se_base_reorder@tools$Staffli <- se@tools$Staffli
 
 se_base_reorder <- LoadImages(
@@ -528,8 +330,6 @@ for (i in seq_along(samples)) {
   )
 }
 
-saveRDS(se_base_reorder, "se_base_reorder2.rds")
-
 n_clusters <- length(unique(se_base_reorder$Clusters))
 cols <- colorRampPalette(
   c(
@@ -539,130 +339,10 @@ cols <- colorRampPalette(
 
 names(cols) <- paste0("C", seq_len(n_clusters))
 
-######### Define functions #########
-
-### Create Adjacency Matrix
-
-#' Create Adjacency Matrix
-#' 
-#' @param nbs.df Data frame with output from STUtility::GetSpatNet() data for all clusters of interest. Rows should correspond to spot ID and columns should include cluster IDs as well as colums starting with "nbs_".
-#' @param column.clusters.id Column name in nbs.df corresponding to cluster ID of the spots. Default "seurat_clusters".
-#' @param cluster.include Vector of cluster IDs to include in your analysis.
-#' @return Adjacency matrix with number of neighbours present between each cluster pair
-#' @export
-CreateAdjMatrix <- function(
-    nbs.df,
-    column.clusters.id = "seurat_clusters",
-    cluster.include
-) {
-  nbs_adjmat <- matrix(
-    0L, nrow = length(cluster.include), ncol = length(cluster.include)
-  )
-  for (i in seq_along(cluster.include)) {
-    c <- cluster.include[i]
-    c_nbs_df <- nbs.df[nbs.df[,column.clusters.id] == c, ]
-    for (j in seq_along(cluster.include)) {
-      nbs <- paste0("nbs_", cluster.include[j])
-      if (j == i) {
-        n_nbs <- sum(!is.na(c_nbs_df[, nbs] == c))
-      } else {
-        n_nbs <- sum(!is.na(c_nbs_df[, nbs] == nbs))
-      }
-      nbs_adjmat[i,j] <- n_nbs
-      if (nbs_adjmat[j, i] > 0) {
-        nbs_adjmat[i, j] <- nbs_adjmat[j, i] <- max(c(nbs_adjmat[i, j], nbs_adjmat[j, i]))
-      }
-    }
-    nbs_adjmat[i, i] <- sum(nbs_adjmat[i, ][-i])
-  }
-  return(nbs_adjmat)
-}
-
-### Adjacency Matrix per Subject
-
-#' Create Adjacency Matrix per Subject
-#' 
-#' @param nbs.df Data frame with output from STUtility::GetSpatNet() data for all clusters of interest. Rows should correspond to spot ID and columns should include cluster IDs as well as colums starting with "nbs_".
-#' @param se.metadata Metadata dataframe from seurat object containing Sample IDs for each spot.
-#' @param column.clusters.id Column name in nbs.df corresponding to cluster ID of the spots. Default "seurat_clusters".
-#' @param cluster.include Vector of cluster IDs to include in your analysis.
-#' @param column.subject.id Column name in se.metadata corresponding to Sample ID of the spots.
-#' @return List of adjacency matrices with number of neighbours present between each cluster pair. Each matrix in the list corresponds to data from one sample.
-#' @export
-CreateAdjMatrixPerSubject <- function(
-    nbs.df,
-    se.metadata,
-    column.clusters.id = "seurat_clusters",
-    cluster.include,
-    column.subject.id
-){
-  nbs_adjmat_list <- list()
-  subjects_include <- unique(as.character(se.metadata[, column.subject.id]))
-  
-  for (subject_id in subjects_include) {
-    rows_subject <- rownames(
-      se.metadata[se.metadata[,column.subject.id] %in% subject_id, ]
-    )
-    nbs.df_subject <- nbs.df[rows_subject, ]
-    
-    nbs_adjmat <- CreateAdjMatrix(
-      nbs.df = nbs.df_subject,
-      cluster.include = cluster.include,
-      column.clusters.id = column.clusters.id
-    )
-    
-    nbs_adjmat_list[[subject_id]] <- nbs_adjmat
-  }
-  return(nbs_adjmat_list)
-}
-
-### Randomise Cluster IDs within Subject data
-
-#' Randomise Cluster IDs within Subject data
-#' 
-#' @param se.object Seurat (STUtility) object containing cluster and sample identities for each spot in the metadata.
-#' @param column.clusters.id Column name in metadata corresponding to cluster ID of the spots. Default "seurat_clusters".
-#' @param column.subject.id Column name in metadata corresponding to Sample ID of the spots.
-#' @return New Seurat object with shuffled cluster identities per sample
-#' @export
-RandomiseClusteringIDs <- function(
-  se.object,
-  column.cluster.id,
-  column.sample.id,
-  random.seed = NA
-) {
-  if (!is.na(random.seed)) {
-    message(paste("Setting random seed to", random.seed))
-    set.seed(random.seed)
-  }
-  #' Shuffle cluster ids for each sample
-  se_metadata <- se.object@meta.data[, c(column.cluster.id, column.sample.id)]
-  se_metadata$clusters_original <- se_metadata[, column.cluster.id]
-  se_metadata$sample_id <- se_metadata[, column.sample.id]
-
-  se_metadata_perm <- se_metadata %>%
-    dplyr::group_by(sample_id) %>%
-    dplyr::mutate(
-      clusters_perm = clusters_original[sample(dplyr::row_number())]
-    )
-  #' Add shuffled clusters to se object metadata
-  se.object <- AddMetaData(
-    se.object,
-    as.character(se_metadata_perm$clusters_perm),
-    col.name = "clusters_perm"
-  )
-  return(se.object)
-}
-
-minmax_norm <- function(x) {
-  return((x - min(x)) / (max(x) - min(x)))
-}
-
 # RUN NBS ANALYSIS
 print("RUN NBS ANALYSIS")
 se_base <- se_base_reorder
 
-# ======================================================================
 #' RUN NBS ANALYSIS
 #'
 #' "EXPECTED" VALUES: RegionNeighbours() with permuted cluster IDs for each
@@ -717,9 +397,9 @@ for (i in 1:n_cols) {
 
 #' Check if random data is normally dist.
 perm_adj_mat_df <- data.frame(
-  matrix(unlist(perm_adj_mat_list),
-  nrow=length(perm_adj_mat_list),
-  byrow=TRUE)
+  matrix(
+    unlist(perm_adj_mat_list), nrow = length(perm_adj_mat_list), byrow = TRUE
+  )
 )
 perm_adj_mat_df$perm_n <- rownames(perm_adj_mat_df)
 perm_adj_mat_df_long <- reshape2::melt(perm_adj_mat_df, id.vars = c("perm_n"))
@@ -740,12 +420,12 @@ for (c in c_include) {
 }
 
 # Create df with nbs info
-nbs_df <- se_base[[]][, c(
-  "seurat_clusters",
-  grep(pattern = "nbs",
-  colnames(se_base[[]]),
-  value = TRUE
-))]
+nbs_df <- se_base[[]][,
+  c(
+    "seurat_clusters",
+    grep(pattern = "nbs", colnames(se_base[[]]), value = TRUE)
+  )
+]
 
 c_count <- nbs_df %>%
   dplyr::group_by(seurat_clusters) %>%
@@ -771,7 +451,7 @@ nbs_adjmat <- CreateAdjMatrix(
 nbs_adjmat_norm <- nbs_adjmat
 for (i in seq(1:dim(nbs_adjmat_norm)[1])) {
   for (j in seq(1:dim(nbs_adjmat_norm)[1])) {
-    e_sum <- sum(nbs_adjmat_norm[i,i], nbs_adjmat_norm[j,j])
+    e_sum <- sum(nbs_adjmat_norm[i, i], nbs_adjmat_norm[j, j])
     if (i != j) {
       nbs_adjmat_norm[i, j] <- round(nbs_adjmat_norm[i, j] / e_sum, 4) * 100
     }
@@ -782,7 +462,7 @@ nbs_adjmat_permscore <- round(
   ((nbs_adjmat - perm_adj_mat_avg) / perm_adj_mat_sd), digits = 3
 )
 
-# replace NaN value with zero 
+# replace NaN value with zero
 nbs_adjmat_permscore[is.nan(nbs_adjmat_permscore)] <- 0
 
 max_diagonal_val <- max(nbs_adjmat_permscore[nbs_adjmat_permscore > 0])
@@ -848,9 +528,9 @@ for (i in 1:n_perm) {
     )
   ]
   perm_adj_mat_list_subject_id <- CreateAdjMatrixPerSubject(
-    nbs.df = perm_nbs_df, 
-    se.metadata = se_base@meta.data, 
-    cluster.include = c_include, 
+    nbs.df = perm_nbs_df,
+    se.metadata = se_base@meta.data,
+    cluster.include = c_include,
     column.clusters.id = "clusters_perm",
     column.subject.id = "sample_id"
   )
@@ -870,10 +550,10 @@ for (subject_id in names(perm_adj_mat_list_subject[[1]])) {
     for (j in 1:n_cols) {
       list_ij <- c()
       for (list_n in 1:length(perm_adj_mat_list_subject_id)) {
-        list_ij <- c(list_ij, perm_adj_mat_list_subject_id[[list_n]][i,j])
+        list_ij <- c(list_ij, perm_adj_mat_list_subject_id[[list_n]][i, j])
       }
-      perm_adj_mat_avg_subject[i,j] <- mean(list_ij)
-      perm_adj_mat_sd_subject[i,j] <- sd(list_ij)
+      perm_adj_mat_avg_subject[i, j] <- mean(list_ij)
+      perm_adj_mat_sd_subject[i, j] <- sd(list_ij)
     }
     perm_adj_mat_avg_list_subject[[subject_id]] <- perm_adj_mat_avg_subject
     perm_adj_mat_sd_list_subject[[subject_id]] <- perm_adj_mat_sd_subject
@@ -884,20 +564,23 @@ for (subject_id in names(perm_adj_mat_list_subject[[1]])) {
 nbs_adjmat_permscore_subject <- list()
 for (subject_id in names(nbs_adjmat_list_subject)) {
   nbs_adjmat_permscore_subject[[subject_id]] <- round(
-    (nbs_adjmat_list_subject[[subject_id]] -
-      perm_adj_mat_avg_list_subject[[subject_id]]) /
-        perm_adj_mat_sd_list_subject[[subject_id]],
+    (
+      nbs_adjmat_list_subject[[subject_id]] -
+        perm_adj_mat_avg_list_subject[[subject_id]]
+    ) /
+      perm_adj_mat_sd_list_subject[[subject_id]],
     digits = 3
   )
   diag(nbs_adjmat_permscore_subject[[subject_id]]) <- diag(
     nbs_adjmat_list_subject[[subject_id]]
   )
-  
+
   #' Set row/column names
   names_vector <- paste0("C", c_include)
   colnames(nbs_adjmat_permscore_subject[[subject_id]]) <- names_vector
   rownames(nbs_adjmat_permscore_subject[[subject_id]]) <- names_vector
 }
+
 # ===================================
 #' PLOTS
 color_low2 <- "#62376e"
@@ -918,19 +601,19 @@ df <- data.frame(
 )
 links <- data.frame(
   source = as_edgelist(g, names = TRUE)[, 1],
-  target = as_edgelist(g, names = TRUE)[, 2])
+  target = as_edgelist(g, names = TRUE)[, 2]
+)
 
 g_df_norm <- data.frame(
   links,
   weight = E(g)$weight,
-  weight_minmax = minmax_norm(abs(E(g)$weight))
+  weight_minmax = minmax_norm(abs(E(g)$weight)) # from utils.R
 )
 
 g2 <- graph_from_data_frame(d = links, vertices = df, directed = FALSE)
 
 g2 <- set_edge_attr(g2, "weight", value = E(g)$weight)
 E(g2)$width <- E(g2)$weight * 1.5
-
 
 #' PLOT 3: Permuted score values
 #' Make graph
@@ -954,12 +637,14 @@ links <- data.frame(
 g_df_permscore <- data.frame(
   links,
   weight = E(g)$weight,
-  weight_minmax = minmax_norm(abs(E(g)$weight))
+  weight_minmax = minmax_norm(abs(E(g)$weight)) # from utils.R
 )
 
 g2 <- graph_from_data_frame(d = links, vertices = df, directed = FALSE)
 
-g2 <- set_edge_attr(g2, "weight", value = minmax_norm(abs(E(g)$weight)))
+g2 <- set_edge_attr(  # from utils.R
+  g2, "weight", value = minmax_norm(abs(E(g)$weight))
+)
 E(g2)$width <- (E(g2)$weight + 0.1) * 14
 
 fname <- paste0("nbs_analysis.permscore.", project_name, ".pdf")
