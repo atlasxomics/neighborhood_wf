@@ -136,7 +136,7 @@ ct <- as.matrix(se_base@assays$scATAC@layers$counts)
 colnames(ct) <- colnames(se_base)
 rownames(ct) <- rownames(se_base)
 ct <- ct[, match(my_vec, colnames(ct))]
-meta.data <- se_base@meta.data[match(my_vec, rownames(se_base@meta.data)), ]
+meta_data <- se_base@meta.data[match(my_vec, rownames(se_base@meta.data)), ]
 
 se_base_reorder <- CreateSeuratObject(
   counts = as.data.frame(ct),
