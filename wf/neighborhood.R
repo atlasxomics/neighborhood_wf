@@ -88,7 +88,7 @@ for (run in runs) {
   dir.create(ctmat, recursive = TRUE)
 }
 
-# make dir /root/neighborhood/figures
+# Make dir /root/neighborhood/figures -----
 figs_dir <- "neighborhood/figures"
 dir.create(file.path(cidr, figs_dir), recursive = TRUE)
 
@@ -104,11 +104,12 @@ my_vec <- c()
 
 for (sample in samples) {
 
-  se_base_D_ordered <- se_base[, which(
+  # Filter combined to individual sample ------
+  se_base_d_ordered <- se_base[, which(
     se_base@meta.data$Sample == sample
   )]@meta.data
 
-  # Get intersect of barcodes bt obj metadata and tissue_positions
+  # Get intersect of barcodes bt obj@metadata and tissue_positions -----
   req_order <- intersect(
     read.csv(
       paste0(
@@ -116,81 +117,116 @@ for (sample in samples) {
       ),
       header = FALSE
     )$V1,
-    se_base_D_ordered$barcode
+    se_base_d_ordered$barcode
   )
 
-  se_base_D_ordered$barcode <- factor(
-    se_base_D_ordered$barcode,
+  # Add barcodes as factor and order according to barcode file ----
+  se_base_d_ordered$barcode <- factor(
+    se_base_d_ordered$barcode,
     levels = req_order
   )
 
-  se_base_D_ordered <- se_base_D_ordered[order(se_base_D_ordered$barcode), ]
+  se_base_d_ordered <- se_base_d_ordered[order(se_base_d_ordered$barcode), ]
 
-  new_value <- rownames(se_base_D_ordered)
+  # Store ordered barcodes (rownames) and add to vector ----
+  new_value <- rownames(se_base_d_ordered)
 
-  print(sample)
-  my_vec <- c(my_vec, new_value) # Appending new value to vector
+  print(paste("Barcodes reordered for sample", sample))
+  my_vec <- c(my_vec, new_value)
 }
 
-ct <- as.matrix(se_base@assays$scATAC@layers$counts)
-colnames(ct) <- colnames(se_base)
-rownames(ct) <- rownames(se_base)
-ct <- ct[, match(my_vec, colnames(ct))]
-meta_data <- se_base@meta.data[match(my_vec, rownames(se_base@meta.data)), ]
+# print("Can I make this thing a matrix?")
+# Matrix::Matrix(se_base@assays$scATAC@layers$counts, sparse = FALSE)
 
-se_base_reorder <- CreateSeuratObject(
-  counts = as.data.frame(ct),
-  assay = "scATAC",
-  meta.data = meta.data
-)
+# print("Now I'm assigning it to ct.")
+# # Extract counts and meta.data; reorder to match barcode file -----
+# ct <- Matrix::Matrix(se_base@assays$scATAC@layers$counts, sparse = FALSE)
+# colnames(ct) <- colnames(se_base)
+# rownames(ct) <- rownames(se_base)
 
-for (i in sort(names(se_base@reductions))) {
-  embeddings <- Embeddings(se_base, reduction = i)
+# # Reorder according to barcode csv values stored in my_vec, reorder metadata --
+# ct <- ct[, match(my_vec, colnames(ct))]
+# meta_data <- se_base@meta.data[match(my_vec, rownames(se_base@meta.data)), ]
 
-  # All cells in reductions must be in the same order as in the Seurat object
-  embeddings <- embeddings[
-    match(colnames(se_base_reorder), rownames(embeddings)),
-  ]
 
-  # this is for seurat >= v5.0
-  se_base_reorder@reductions[[i]] <- CreateDimReducObject(
-    embeddings = embeddings,
-    key = paste0(i, "_"),
-    assay = DefaultAssay(se_base_reorder)
-  )
-}
+# # Create SeuratObj with reordered data -----
+# matrix_size <- ncol(se_base) * nrow(se_base)
 
-se_base_reorder <- NormalizeData(
-  se_base_reorder,
-  normalization.method = "LogNormalize",
-  scale.factor = 10000
-)
-se_base_reorder <- FindVariableFeatures(
-  se_base_reorder,
-  selection.method = "vst",
-  nfeatures = nrow(se_base_reorder)
-)
-se_base_reorder@meta.data$barcodes1 <- rownames(se_base_reorder@meta.data)
+# if (matrix_size < 2^31 - 1) {
+
+#   print("Feature matrix less than 2^31 -1...")
+#   se_base_reorder <- Seurat::CreateSeuratObject(
+#     counts = as.data.frame(ct),
+#     assay = "scATAC",
+#     meta.data = meta_data
+#   )
+# } else {
+
+#   print("Feature matrix greater than 2^31 -1; using BPCells...")
+
+#   # Use BPCells to handle large matrices ----
+#   # Convert SeuratObjs to BPCells files --
+
+#   path <- paste0("/root//neighborhood/se_base_BP")
+#   BPCells::write_matrix_dir(mat = ct, dir = path, overwrite = TRUE)
+#   ct_bp <- BPCells::open_matrix_dir(dir = path)
+
+#   # Create reordered SeuratObject -----
+#   se_base_reorder <- Seurat::CreateSeuratObject(
+#     counts = ct_bp,
+#     assay = "scATAC",
+#     meta.data = meta_data
+#   )
+# }
+
+# for (i in sort(names(se_base@reductions))) {
+
+#   # All cells in reductions must be in the same order as in the SeuratObject
+#   embeddings <- Embeddings(se_base, reduction = i)
+
+#   embeddings <- embeddings[
+#     match(colnames(se_base_reorder), rownames(embeddings)),
+#   ]
+
+#   se_base_reorder@reductions[[i]] <- CreateDimReducObject(
+#     embeddings = embeddings,
+#     key = paste0(i, "_"),
+#     assay = DefaultAssay(se_base_reorder)
+#   )
+# }
+
+# se_base_reorder <- NormalizeData(
+#   se_base_reorder,
+#   normalization.method = "LogNormalize",
+#   scale.factor = 10000
+# )
+# se_base_reorder <- FindVariableFeatures(
+#   se_base_reorder,
+#   selection.method = "vst",
+#   nfeatures = nrow(se_base_reorder)
+# )
+
+# se_base_reorder@meta.data$barcodes1 <- rownames(se_base_reorder@meta.data)
 
 for (sample in samples) {
 
-  D_ <- se_base[, which(se_base@meta.data$sample == sample)]
+  d <- se_base[, which(se_base@meta.data$sample == sample)]
 
   write.table(
     data.frame(
       unname(
         mapIds(
           species,
-          rownames(D_),
+          rownames(d),
           keytype = "SYMBOL",
           column = "ENSEMBL",
           multiVals = "first"
         )
       ),
-      rownames(D_),
+      rownames(d),
       rep(
         "Gene Expression",
-        length(rownames(D_))
+        length(rownames(d))
       )
     ),
     gzfile(
@@ -206,7 +242,7 @@ for (sample in samples) {
 
   # We compress it deleting the .csv
   write.table(
-    D_@meta.data$barcode,
+    d@meta.data$barcode,
     gzfile(
       paste0(
         "/root/neighborhood/data/", sample, "/ctmat/barcodes.tsv.gz"
@@ -219,7 +255,7 @@ for (sample in samples) {
   )
 
   writeMM(
-    obj = D_@assays$scATAC@layers$counts,
+    obj = d@assays$scATAC@layers$counts,
     file = (
       paste0("/root/neighborhood/data/", sample, "/ctmat/matrix.mtx.gz")
     )
@@ -289,48 +325,45 @@ se <- InputFromTable(
   platform =  "Visium"
 )
 
-new.names <- colnames(se)
-renamed.assay <- RenameCells(se_base_reorder, new.names = new.names)
+new_names <- colnames(se)
+renamed_assay <- RenameCells(se_base, new.names = new_names)
 
-se_base_reorder <- renamed.assay
+se_base <- renamed_assay
 
 head(se@tools$Staffli@imgs)
 
 # Add Staffli
-se_base_reorder@tools$Staffli <- se@tools$Staffli
+se_base@tools$Staffli <- se@tools$Staffli
 
-se_base_reorder <- LoadImages(
-  se_base_reorder,
+se_base <- LoadImages(
+  se_base,
   time.resolve = TRUE,
   verbose = TRUE,
   xdim = 100
 )
 
-se_base_reorder@meta.data$seurat_clusters <- se_base_reorder@meta.data$Clusters
-se_base_reorder@meta.data$seurat_clusters <- gsub(
+se_base@meta.data$seurat_clusters <- se_base@meta.data$Clusters
+se_base@meta.data$seurat_clusters <- gsub(
   "C",
   "",
-  se_base_reorder@meta.data$seurat_clusters
+  se_base@meta.data$seurat_clusters
 )
 
 c_include <- seq(
-  1, max(as.numeric(se_base_reorder@meta.data$seurat_clusters)), 1
+  1, max(as.numeric(se_base@meta.data$seurat_clusters)), 1
 )
 
-se_base_reorder@meta.data$sample_id <- se_base_reorder@meta.data$Sample
-
-samples <- sort(unique(se_base_reorder@meta.data$Sample))
-samples
+se_base@meta.data$sample_id <- se_base@meta.data$sample
 
 for (i in seq_along(samples)) {
-  se_base_reorder@meta.data$sample_id <- gsub(
+  se_base@meta.data$sample_id <- gsub(
     samples[i],
     paste0("S", i),
-    se_base_reorder@meta.data$sample_id
+    se_base@meta.data$sample_id
   )
 }
 
-n_clusters <- length(unique(se_base_reorder$Clusters))
+n_clusters <- length(unique(se_base$Clusters))
 cols <- colorRampPalette(
   c(
     "blue", "red", "dark green", "orange", "purple", "brown", "cyan", "yellow"
@@ -341,7 +374,6 @@ names(cols) <- paste0("C", seq_len(n_clusters))
 
 # RUN NBS ANALYSIS
 print("RUN NBS ANALYSIS")
-se_base <- se_base_reorder
 
 #' RUN NBS ANALYSIS
 #'
