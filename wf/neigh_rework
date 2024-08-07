@@ -40,7 +40,32 @@ annotations <- list(
 )
 species <- annotations[[genome]]
 
-# Make directory structure ----------------------------------------------------
+# Create list of SeuratObjs, rename cells with run_id to be unique -----
+seuratobj_paths <- sapply(runs, `[`, 2)
+seurat_list <-  lapply(seuratobj_paths, readRDS)
+all <- rename_cells(seurat_list) # from utils.R
+
+# Combine SeuratObject for each run into 'combined' SeuratObject --------------
+samples <- find_sample_names(all) # from utils.R
+
+# Extract image coordinates as -(imagecols) | imagerow -----
+spatial <- lapply(all, function(x) {
+  df <- as.data.frame(x@images[[1]]@coordinates[, c(5, 4)])
+  colnames(df) <- paste0("Spatial_", 1:2)
+  df$Spatial_2 <- -df$Spatial_2
+  df
+})
+
+print("Creating combined SeuratObject...")
+combined <- combine_objs(all, samples, spatial, project_name)  # from utils.R
+
+n_cells <- ncol(combined)
+n_feats <- nrow(combined)
+matrix_size <- n_cells * n_feats
+print(paste("Number cells:", n_cells, "; number features", n_feats))
+
+# Main script -----------------------------------------------------------------
+
 for (run in runs) {
 
   run_id <- run[1]
@@ -72,22 +97,24 @@ for (run in runs) {
 figs_dir <- "neighborhood/figures"
 dir.create(file.path(cidr, figs_dir), recursive = TRUE)
 
-# Create ordered, combined SeuratObject ---------------------------------------
-# Load in list of old SeuratObjs ----
-seuratobj_paths <- sapply(runs, `[`, 2)
-seurat_list <-  lapply(seuratobj_paths, readRDS)
+se_base <- combined
+strsplits <- strsplit(rownames(se_base@meta.data), "\\s|#")
 
-# For each run, filter barcodes by position file, order object by barcodes ----
-ordered_list <- c()
-for (obj in seurat_list) {
+se_base@meta.data$sample <- extract_nth_ele(strsplits, 1) # from utils.R
+se_base@meta.data$barcode <- extract_nth_ele(strsplits, 2) # from utils.R
 
-  sample <- unique(obj@meta.data[["Sample"]])
+samples <- sort(unique(se_base@meta.data$sample))
 
-  strsplits <- strsplit(rownames(obj@meta.data), "\\s|#")
-  obj@meta.data$sample <- extract_nth_ele(strsplits, 1) # from utils.R
-  obj@meta.data$barcode <- extract_nth_ele(strsplits, 2) # from utils.R
+my_vec <- c()
 
-  # Get intersect of barcodes bt obj@metadata and tissue_positions --
+for (sample in samples) {
+
+  # Filter combined to individual sample ------
+  se_base_d_ordered <- se_base[, which(
+    se_base@meta.data$Sample == sample
+  )]@meta.data
+
+  # Get intersect of barcodes bt obj@metadata and tissue_positions -----
   req_order <- intersect(
     read.csv(
       paste0(
@@ -95,61 +122,99 @@ for (obj in seurat_list) {
       ),
       header = FALSE
     )$V1,
-    obj$barcode
+    se_base_d_ordered$barcode
   )
 
-  # Add barcodes as factor and order according to barcode file --
-  obj$barcode <- factor(
-    obj$barcode,
+  # Add barcodes as factor and order according to barcode file ----
+  se_base_d_ordered$barcode <- factor(
+    se_base_d_ordered$barcode,
     levels = req_order
   )
-  obj <- obj[order(obj$barcode), ]
 
-  ordered_list <- c(ordered_list, obj)
+  se_base_d_ordered <- se_base_d_ordered[order(se_base_d_ordered$barcode), ]
+
+  # Store ordered barcodes (rownames) and add to vector ----
+  new_value <- rownames(se_base_d_ordered)
+
   print(paste("Barcodes reordered for sample", sample))
+  my_vec <- c(my_vec, new_value)
 }
 
-# Rename cells with run_id to be unique ----
-all <- rename_cells(ordered_list) # from utils.R
+# Extract counts and meta.data; reorder to match barcode file -----
+if (matrix_size < 2^31 - 1) {
 
-# Combine SeuratObject for each run into 'combined' SeuratObject ----
-samples <- find_sample_names(all) # from utils.R
+  print("Feature matrix less than 2^31 -1; using Matrix...")
+  ct <- as.matrix(se_base@assays$scATAC@layers$counts)
 
-# Extract image coordinates as -(imagecols) | imagerow -----
-spatial <- lapply(all, function(x) {
-  df <- as.data.frame(x@images[[1]]@coordinates[, c(5, 4)])
-  colnames(df) <- paste0("Spatial_", 1:2)
-  df$Spatial_2 <- -df$Spatial_2
-  df
-})
+  colnames(ct) <- colnames(se_base)
+  rownames(ct) <- rownames(se_base)
+  ct <- ct[, match(my_vec, colnames(ct))]
 
-print("Creating combined SeuratObject...")
-combined <- combine_objs(all, samples, spatial, project_name)  # from utils.R
+} else {
 
-n_cells <- ncol(combined)
-n_feats <- nrow(combined)
-matrix_size <- n_cells * n_feats
-print(paste("Number cells:", n_cells, "; number features", n_feats))
+  print("Feature matrix greater than 2^31 -1; chunking...")
+  seurat_chunks <- chunk_seurat_object(se_base)
 
-# Manipulate se_base ----------------------------------------------------------
+  bpc_counts <- c()
+  for (i in seq_along(seurat_chunks)) {
 
-se_base_reorder <- combined
+    counts <- seurat_chunks[[1]]@assays[[1]]$counts
 
-# for (i in sort(names(se_base@reductions))) {
+    path <- paste0("/root/Snuderl_allv7/chunk_", i, "_BP")
+    BPCells::write_matrix_dir(
+      mat = counts,
+      dir = path,
+      overwrite = TRUE
+    )
+    bpc_counts[[i]] <- BPCells::open_matrix_dir(dir = path)
+  }
+}
 
-#   # All cells in reductions must be in the same order as in the SeuratObject
-#   embeddings <- Embeddings(se_base, reduction = i)
+print("Chunking worked??")
 
-#   embeddings <- embeddings[
-#     match(colnames(se_base_reorder), rownames(embeddings)),
-#   ]
 
-#   se_base_reorder@reductions[[i]] <- CreateDimReducObject(
-#     embeddings = embeddings,
-#     key = paste0(i, "_"),
-#     assay = DefaultAssay(se_base_reorder)
-#   )
-# }
+# Extract and reorder metadata --
+meta_data <- se_base@meta.data[match(my_vec, rownames(se_base@meta.data)), ]
+
+# Create SeuratObj with reordered data -----
+if (matrix_size < 2^31 - 1) {
+
+  print("Feature matrix less than 2^31 -1; using Matrix...")
+  se_base_reorder <- Seurat::CreateSeuratObject(
+    counts = ct,
+    assay = "scATAC",
+    meta.data = meta_data
+  )
+} else {
+
+  print("Feature matrix greater than 2^31 -1; using BPCells...")
+
+  # Use BPCells to handle large matrices ----
+
+  # Create reordered SeuratObject -----
+  se_base_reorder <- Seurat::CreateSeuratObject(
+    counts = bpc_counts,
+    assay = "scATAC",
+    meta.data = meta_data
+  )
+  print("seuratobject worked???")
+}
+
+for (i in sort(names(se_base@reductions))) {
+
+  # All cells in reductions must be in the same order as in the SeuratObject
+  embeddings <- Embeddings(se_base, reduction = i)
+
+  embeddings <- embeddings[
+    match(colnames(se_base_reorder), rownames(embeddings)),
+  ]
+
+  se_base_reorder@reductions[[i]] <- CreateDimReducObject(
+    embeddings = embeddings,
+    key = paste0(i, "_"),
+    assay = DefaultAssay(se_base_reorder)
+  )
+}
 
 se_base_reorder <- NormalizeData(
   se_base_reorder,
@@ -166,7 +231,7 @@ se_base_reorder@meta.data$barcodes1 <- rownames(se_base_reorder@meta.data)
 
 for (sample in samples) {
 
-  d <- se_base_reorder[, which(se_base_reorder@meta.data$Sample == sample)]
+  d <- se_base[, which(se_base@meta.data$sample == sample)]
 
   write.table(
     data.frame(
@@ -210,10 +275,8 @@ for (sample in samples) {
     quote = FALSE
   )
 
-  # Ensure counts as spare matrix (not true for bpcells)
-  sparse_counts <- as(d@assays$scATAC@layers$counts, "dgCMatrix")
   writeMM(
-    obj = sparse_counts,
+    obj = d@assays$scATAC@layers$counts,
     file = (
       paste0("/root/neighborhood/data/", sample, "/ctmat/matrix.mtx.gz")
     )

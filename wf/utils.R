@@ -3,6 +3,35 @@ library("dplyr")
 library("purrr")
 library("Seurat")
 
+chunk_seurat_object <- function(seurat_obj, max_elements = 2^31 - 1) {
+  #' Function to chunk SeuratObject into minimum number chunks, such that no
+  #' chunck exceeds the integer limit for sparse matrices; written mostly by
+  #' GPT4.
+
+  # Calculate the number of cells per chunk
+  num_cells <- ncol(seurat_obj)
+  num_features <- nrow(seurat_obj)
+  max_cells_per_chunk <- floor(max_elements / num_features)
+
+  # Split the cells into chunks
+  cell_indices <- split(
+    1:num_cells,
+    ceiling(seq_along(1:num_cells) / max_cells_per_chunk)
+  )
+
+  # Create a list to store the chunks
+  seurat_chunks <- list()
+
+  # Loop through each chunk of cells
+  for (i in seq_along(cell_indices)) {
+    cells <- cell_indices[[i]]
+    chunk <- subset(seurat_obj, cells = colnames(seurat_obj)[cells])
+    seurat_chunks[[i]] <- chunk
+  }
+
+  return(seurat_chunks)
+}
+
 extract_nth_ele <- function(lst, n = 1) {
   #' Extract nth element for each item in an array; return as a vector.
   sapply(lst, `[`, n)
