@@ -124,6 +124,10 @@ def neighborhoodanalysis_workflow(
     generating R objects and data for downstream analysis of epigenomic
     [Neighborhood Analysis](https://www.cell.com/cell-metabolism/fulltext/S1550-4131(21)00363-6?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS1550413121003636%3Fshowall%3Dtrue).
 
+    > This workflow does not support combined feature count matrices with >
+    2^31 - 1 elements (~100,000 cells); we are working to add support for large
+    matrices in a future version.
+
     ## Inputs
     workflow takes the following parameters,
     * Seurat object file: A seurat object created by [create ArchRProject](https://wiki.latch.bio/workflows/overview) workflow per sample
