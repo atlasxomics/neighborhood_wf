@@ -9,7 +9,9 @@
 
 **neighborhood Analysis** is a [latch.bio](https://latch.bio/) workflow for generating R objects and data for downstream analysis of epigenomic [Neighborhood Analysis](https://www.cell.com/cell-metabolism/fulltext/S1550-4131(21)00363-6?_returnURL=https%3A%2F%2Flinkinghub.elsevier.com%2Fretrieve%2Fpii%2FS1550413121003636%3Fshowall%3Dtrue#secsectitle0010).
 
-> This workflow does not support combined feature count matrices with > 2^31 - 1 elements (~100,000 cells); we are working to add support for large matrices in a future version. 
+> This Workflow does not support combined feature count matrices with > 2^31 - 1 elements (~100,000 cells); we are working to add support for large matrices in a future version. 
+
+> The Run ID for each run **must match the Run ID used to create the SeuratObj**; this can be found in the path for the SeuratObject (i.e., ArchRProjects/[project_name]/**[run_id]**_SeuratObj.rds).
 
 ## Inputs
 workflow takes the following parameters:
@@ -21,7 +23,7 @@ workflow takes the following parameters:
 
 * [Spatial folder](https://docs.atlasxomics.com/projects/AtlasXbrowser/en/latest/SpatialFolder.html): A directory containing tissue images and experiment metadata
 
-* Run ID: An identifier for the run
+* Run ID: An identifier for the run; **must match the Run ID used to create the SeuratObj** (i.e., ArchRProjects/[project_name]/**[run_id]**_SeuratObj.rds)
 
 * Condition (_optional_):  An experimental Condition descriptor (ie. 'control', 'diseased')
 

@@ -128,12 +128,17 @@ def neighborhoodanalysis_workflow(
     2^31 - 1 elements (~100,000 cells); we are working to add support for large
     matrices in a future version.
 
+    > The Run ID for each run **must match the Run ID used to create the
+    SeuratObj**; this can be found in the path for the SeuratObject (i.e.,
+    ArchRProjects/[project_name]/**[run_id]**_SeuratObj.rds).
+
     ## Inputs
     workflow takes the following parameters,
     * Seurat object file: A seurat object created by [create ArchRProject](https://wiki.latch.bio/workflows/overview) workflow per sample
     * [tissue_positions_list.csv](https://docs.atlasxomics.com/projects/AtlasXbrowser/en/latest/SpatialFolder.html): A comma-separated file in which each row contains a unique barcode, an indicator for whether the tixel is 'on-tissue' (1, 0), and a row/column index
     * [Spatial folder](https://docs.atlasxomics.com/projects/AtlasXbrowser/en/latest/SpatialFolder.html): A directory containing tissue images and experiment metadata
-    * Run ID: An identifier for the run
+    * Run ID: An identifier for the run; **must match the Run ID used to
+    create the SeuratObj** (i.e., ArchRProjects/[project_name]/**[run_id]**_SeuratObj.rds)
     * Condition (_optional_):  An experimental Condition descriptor
     (ie. 'control', 'diseased')
     Individual runs are batched in a Project with the following global
