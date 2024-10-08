@@ -78,6 +78,8 @@ RUN R -e "renv::restore()"
 COPY neighborhood_wf.Rproj /root/neighborhood_wf.Rproj
 COPY .renvignore /root/.renvignore
 
+RUN R -e "install.packages('https://cran.r-project.org/src/contrib/dbscan_1.2-0.tar.gz', repos = NULL, type = 'source')"
+
 # STOP HERE:
 # The following lines are needed to ensure your build environement works
 # correctly with latch.
